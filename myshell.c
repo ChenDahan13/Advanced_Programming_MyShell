@@ -103,7 +103,7 @@ while (1)
         amper = 0; 
 
     // check for output redirection
-    if (i > 2 && ! strcmp(argv[i - 2], ">")) {
+    if (i >= 2 && ! strcmp(argv[i - 2], ">")) {
         redirect = 1;
         argv[i - 2] = NULL;
         outfile = argv[i - 1];
@@ -112,7 +112,7 @@ while (1)
         redirect = 0; 
 
     // check for error redirection
-    if (i > 2 && ! strcmp(argv[i - 2], "2>")) {
+    if (i >= 2 && ! strcmp(argv[i - 2], "2>")) {
         redirect_error = 1;
         argv[i - 2] = NULL;
         outfile = argv[i - 1];
@@ -121,7 +121,7 @@ while (1)
         redirect_error = 0;
 
     // check for output redirection
-    if (i > 2 && ! strcmp(argv[i - 2], ">>")) {
+    if (i >= 2 && ! strcmp(argv[i - 2], ">>")) {
         redirect_create = 1;
         argv[i - 2] = NULL;
         outfile = argv[i - 1];
