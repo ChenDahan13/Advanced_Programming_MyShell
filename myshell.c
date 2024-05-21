@@ -6,6 +6,7 @@
 #include "stdlib.h"
 #include "unistd.h"
 #include <string.h>
+#include <signal.h>
 
 void initialize_history_commands(char history_commands[20][1024]) {
     for (int i = 0; i < 20; i++) {
@@ -26,6 +27,10 @@ char *get_last_command(char history_commands[20][1024]) {
     return history_commands[0];
 }
 
+void handle_sigint(int sig) {
+    printf("\nYou typed Control-C!\n");
+}
+
 int main() {
 char command[1024];
 char history_commands[20][1024];
@@ -36,6 +41,9 @@ int i, fd, amper, redirect, retid, status;
 int redirect_error, redirect_create;
 char *argv[10];
 char prompt[1024] = "hello: ";
+
+// handle ctrl+c
+signal(SIGINT, handle_sigint);
 
 while (1)
 {   
@@ -141,6 +149,11 @@ while (1)
         }
         printf("\n");
         continue;
+    }
+
+    // exit the shell 
+    if (! strcmp(argv[0], "quit")) {
+        exit(0);
     }
 
     if (fork() == 0) { 
