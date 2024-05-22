@@ -156,7 +156,7 @@ int main() {
             strcat(prompt, " ");
             continue;
         }
-
+        
         // check for !! command
         if (strcmp(command, "!!") == 0) {
             
