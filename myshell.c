@@ -8,6 +8,8 @@
 #include <string.h>
 #include <signal.h>
 
+#define MAX_ARG 20
+
 void initialize_history_commands(char history_commands[20][1024]) {
     for (int i = 0; i < 20; i++) {
         strcpy(history_commands[i], "");
@@ -31,22 +33,26 @@ void handle_sigint(int sig) {
     printf("\nYou typed Control-C!\n");
 }
 
+
 int main() {
 char command[1024];
 char history_commands[20][1024];
 initialize_history_commands(history_commands);
 char *token;
 char *outfile;
-int i, fd, amper, redirect, retid, status;
+int i, fd, amper, redirect, retid, status, argc1;
 int redirect_error, redirect_create;
-char *argv[10];
+char *argv[MAX_ARG], *argv2[MAX_ARG];
 char prompt[1024] = "hello: ";
+int fildes[2];
+int piping;
 
 // handle ctrl+c
 signal(SIGINT, handle_sigint);
 
 while (1)
 {   
+    piping = 0;
     // get the command from the user
     printf("%s", prompt);
     fgets(command, 1024, stdin);
@@ -78,11 +84,15 @@ while (1)
     /* parse command line */
     i = 0;
     token = strtok (command," ");
-    while (token != NULL)
+    while (token != NULL && i < MAX_ARG)
     {
         argv[i] = token;
         token = strtok (NULL, " ");
         i++;
+        if (token && ! strcmp(token, "|")) {
+            piping = 1;
+            break;
+        }
     }
     argv[i] = NULL;
 
@@ -101,6 +111,18 @@ while (1)
     /* Is command empty */
     if (argv[0] == NULL)
         continue;
+
+    /* Does command contain pipe */
+    if (piping) {
+        int index = 0;
+        while (token != NULL)
+        {
+            token = strtok (NULL, " ");
+            argv2[index] = token;
+            index++;
+        }
+        argv2[index] = NULL;
+    }
 
     /* Does command line end with & */ 
     if (i > 0 && ! strcmp(argv[i - 1], "&")) {
@@ -154,6 +176,7 @@ while (1)
     // exit the shell 
     if (! strcmp(argv[0], "quit")) {
         exit(0);
+        break;
     }
 
     if (fork() == 0) { 
@@ -179,11 +202,33 @@ while (1)
             dup(fd); 
             close(fd); 
         }
-        
-        execvp(argv[0], argv);
+
+        if (piping) {
+            pipe (fildes);
+            if (fork() == 0) { 
+                /* first component of command line */ 
+                close(STDOUT_FILENO); 
+                dup(fildes[1]); 
+                close(fildes[1]); 
+                close(fildes[0]); 
+                /* stdout now goes to pipe */ 
+                /* child process does command */ 
+                execvp(argv[0], argv);
+            } 
+            /* 2nd command component of command line */ 
+            close(STDIN_FILENO);
+            dup(fildes[0]);
+            close(fildes[0]); 
+            close(fildes[1]); 
+            /* standard input now comes from pipe */ 
+            execvp(argv2[0], argv2);
+        } 
+        else
+            execvp(argv[0], argv);
     }
     /* parent continues here */
     if (amper == 0)
         retid = wait(&status);
+    }
 }
-}
+
