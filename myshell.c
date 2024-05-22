@@ -33,53 +33,12 @@ void handle_sigint(int sig) {
     printf("\nYou typed Control-C!\n");
 }
 
-
-int main() {
-char command[1024];
-char history_commands[20][1024];
-initialize_history_commands(history_commands);
-char *token;
-char *outfile;
-int i, fd, amper, redirect, retid, status, argc1;
-int redirect_error, redirect_create;
-char *argv[MAX_ARG], *argv2[MAX_ARG];
-char prompt[1024] = "hello: ";
-int fildes[2];
-int piping;
-
-// handle ctrl+c
-signal(SIGINT, handle_sigint);
-
-while (1)
-{   
-    piping = 0;
-    // get the command from the user
-    printf("%s", prompt);
-    fgets(command, 1024, stdin);
-    command[strlen(command) - 1] = '\0';
-
-    // Check for prompt change command 
-    if (strncmp(command, "prompt = ", 9) == 0) {
-        strcpy(prompt, command + 9);
-        strcat(prompt, " ");
-        continue;
-    }
-
-    // check for !! command
-    if (strcmp(command, "!!") == 0) {
-        
-        char* last_command = get_last_command(history_commands);
-        
-        // if no commands in history
-        if (strcmp(last_command, "") == 0) {
-            printf("No commands in history\n");
-            continue;
-        } else { // execute the last command
-            strcpy(command, last_command);
-        }
-    } else { 
-        add_to_history_commands(command, history_commands);
-    }
+void execute(char* command) {
+    char *token;
+    char *outfile;
+    int i, fd, amper, redirect, retid, status;
+    int redirect_error, redirect_create;
+    char *argv[MAX_ARG];
 
     /* parse command line */
     i = 0;
@@ -89,40 +48,8 @@ while (1)
         argv[i] = token;
         token = strtok (NULL, " ");
         i++;
-        if (token && ! strcmp(token, "|")) {
-            piping = 1;
-            break;
-        }
     }
     argv[i] = NULL;
-
-    // check for cd command 
-    if (strcmp(argv[0], "cd") == 0) {
-        if (argv[1] == NULL) {
-            printf("No directory argument\n");
-        } else {
-            if (chdir(argv[1]) != 0) {
-                perror("cd");
-            }
-        }
-        continue;
-    }
-
-    /* Is command empty */
-    if (argv[0] == NULL)
-        continue;
-
-    /* Does command contain pipe */
-    if (piping) {
-        int index = 0;
-        while (token != NULL)
-        {
-            token = strtok (NULL, " ");
-            argv2[index] = token;
-            index++;
-        }
-        argv2[index] = NULL;
-    }
 
     /* Does command line end with & */ 
     if (i > 0 && ! strcmp(argv[i - 1], "&")) {
@@ -159,76 +86,203 @@ while (1)
     else 
         redirect_create = 0;
 
-    // print all arguments
-    if (! strcmp(argv[0], "echo")) {
-        for (int j = 1; j < 9 && argv[j] != NULL; j++) {
-            // check for $? and replace with status
-            if(! strcmp(argv[j], "$?")) {
-                printf("%d ", status);
-            }
-            else
-                printf("%s ", argv[j]);
-        }
-        printf("\n");
-        continue;
-    }
-
     // exit the shell 
     if (! strcmp(argv[0], "quit")) {
         exit(0);
-        break;
     }
 
-    if (fork() == 0) { 
-        
-        if (redirect) {
-            fd = creat(outfile, 0660); 
-            close (STDOUT_FILENO); 
-            dup(fd); 
-            close(fd); 
+    if (redirect) {
+        fd = creat(outfile, 0660); 
+        close (STDOUT_FILENO); 
+        dup(fd); 
+        close(fd); 
             
-        } 
+    } 
 
-        if (redirect_error) {
-            fd = creat(outfile, 0660); 
-            close (STDERR_FILENO); 
-            dup(fd); 
-            close(fd); 
-        }
-
-        if (redirect_create) {
-            fd = open(outfile, O_WRONLY | O_APPEND | O_CREAT, 0660); 
-            close (STDOUT_FILENO); 
-            dup(fd); 
-            close(fd); 
-        }
-
-        if (piping) {
-            pipe (fildes);
-            if (fork() == 0) { 
-                /* first component of command line */ 
-                close(STDOUT_FILENO); 
-                dup(fildes[1]); 
-                close(fildes[1]); 
-                close(fildes[0]); 
-                /* stdout now goes to pipe */ 
-                /* child process does command */ 
-                execvp(argv[0], argv);
-            } 
-            /* 2nd command component of command line */ 
-            close(STDIN_FILENO);
-            dup(fildes[0]);
-            close(fildes[0]); 
-            close(fildes[1]); 
-            /* standard input now comes from pipe */ 
-            execvp(argv2[0], argv2);
-        } 
-        else
-            execvp(argv[0], argv);
+    if (redirect_error) {
+        fd = creat(outfile, 0660); 
+        close (STDERR_FILENO); 
+        dup(fd); 
+        close(fd); 
     }
-    /* parent continues here */
+
+    if (redirect_create) {
+        fd = open(outfile, O_WRONLY | O_APPEND | O_CREAT, 0660); 
+        close (STDOUT_FILENO); 
+        dup(fd); 
+        close(fd); 
+    }
+    
+    execvp(argv[0], argv);
+
     if (amper == 0)
         retid = wait(&status);
+}
+
+
+int main() {
+    char command[1024];
+    char history_commands[20][1024];
+    initialize_history_commands(history_commands);
+    char prompt[1024] = "hello: ";
+    int pipe_count;
+    int status;
+
+    // handle ctrl+c
+    signal(SIGINT, handle_sigint);
+
+    while (1)
+    {   
+        pipe_count = 0;
+        // get the command from the user
+        printf("%s", prompt);
+        fgets(command, 1024, stdin);
+        command[strlen(command) - 1] = '\0';
+
+        if (! strcmp(command, "quit")) {
+            break;
+        }
+
+        // check for pipe
+        for (int i = 0; i < strlen(command); i++) {
+            if (command[i] == '|') {
+                pipe_count++;
+            }
+        }
+
+        // Check for prompt change command 
+        if (strncmp(command, "prompt = ", 9) == 0) {
+            strcpy(prompt, command + 9);
+            strcat(prompt, " ");
+            continue;
+        }
+
+        // check for !! command
+        if (strcmp(command, "!!") == 0) {
+            
+            char* last_command = get_last_command(history_commands);
+            
+            // if no commands in history
+            if (strcmp(last_command, "") == 0) {
+                printf("No commands in history\n");
+                continue;
+            } else { // execute the last command
+                strcpy(command, last_command);
+            }
+        } else { 
+            add_to_history_commands(command, history_commands);
+        }
+
+        // check for cd command 
+        if (strncmp(command, "cd ", 3) == 0) {
+            char* directory = command + 3;
+            if (directory == NULL) {
+                printf("No directory specified\n");
+            } else {
+                if (chdir(directory) == -1) {
+                    perror("chdir");
+                }
+            }
+            continue;
+        }
+
+         // print all arguments echo command
+        if (strncmp(command, "echo ", 5) == 0) {
+            char* cpy_command = command + 5;
+            if (! strcmp(cpy_command, "$?")) {
+                printf("%d\n", status);
+                printf("wtf\n");
+            } else {
+                printf("%s\n", cpy_command);
+                printf("why?\n");
+            }
+        }
+
+        // check for pipe
+        if (pipe_count > 0) {
+            char *token = strtok(command, "|");
+            char *argv[pipe_count + 1];
+            int i = 0;
+            while (token != NULL)
+            {
+                argv[i] = token;
+                token = strtok (NULL, "|");
+                i++;
+            }
+            argv[i] = NULL;
+
+            // create pipes
+            int pipefd[pipe_count][2];
+            for (int i = 0; i < pipe_count; i++) {
+                if (pipe(pipefd[i]) == -1) {
+                    perror("pipe");
+                    exit(1);
+                
+                }
+            }
+
+            int pid;
+            // create child processes
+            for (int i = 0; i < pipe_count + 1; i++) {
+                
+                pid = fork();
+                if (pid == -1) {
+                    perror("fork");
+                    exit(1);
+                } else if (pid == 0) {
+
+                    signal(SIGINT, handle_sigint);
+                    
+                    if (i > 0) {
+                        if(dup2(pipefd[i - 1][0], STDIN_FILENO) == -1 ) {
+                            perror("dup2");
+                            exit(1);
+                        }
+                    }
+
+                    if (i < pipe_count) {
+                        if(dup2(pipefd[i][1], STDOUT_FILENO) == -1 ) {
+                            perror("dup2");
+                            exit(1);
+                        }
+                    }
+
+                    for (int j = 0; j < pipe_count; j++) {
+                        if (i > 0 && j == i - 1) {
+                            close(pipefd[j][1]);
+                        } else if (i < pipe_count && j == i) {
+                            close(pipefd[j][0]);
+                        } else {
+                            close(pipefd[j][0]);
+                            close(pipefd[j][1]);
+                        }
+                    }
+
+                    execute(argv[i]);
+                }
+            }
+
+            for (int i = 0; i < pipe_count; i++) {
+                close(pipefd[i][0]);
+                close(pipefd[i][1]);
+            }
+
+            int status_pipe;
+            for (int i = 0; i < pipe_count + 1; i++) {
+                wait(&status_pipe);
+            }
+
+        } else { // execute the command normally
+            int pid = fork();
+            if (pid == -1) {
+                perror("fork");
+                exit(1);
+            } else if (pid == 0) {
+                signal(SIGINT, handle_sigint);
+                execute(command);
+            }
+        }
+        wait(&status);
     }
 }
 
