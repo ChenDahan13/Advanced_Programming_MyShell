@@ -90,8 +90,6 @@ void execute(char* command) {
                 redirect_oposite = 0;
                 argv[i - 2] = NULL;
                 outfile = argv[i - 1];
-                printf("outfile: %s\n", outfile);
-                printf("redirect_create: %d\n", redirect_create);
             } else {
 
                 if (i >= 2 && ! strcmp(argv[i - 2], "<")) {
@@ -116,7 +114,6 @@ void execute(char* command) {
         exit(0);
     }
 
-    printf("here\n");
     if (redirect) {
         fd = creat(outfile, 0660); 
         close (STDOUT_FILENO); 
