@@ -10,6 +10,8 @@
 
 #define MAX_ARG 20
 
+int last_command_status = 0;
+
 void initialize_history_commands(char history_commands[20][1024]) {
     for (int i = 0; i < 20; i++) {
         strcpy(history_commands[i], "");
@@ -37,7 +39,7 @@ void execute(char* command) {
     char *token;
     char *outfile;
     int i, fd, amper, redirect, retid, status;
-    int redirect_error, redirect_create;
+    int redirect_error, redirect_create, redirect_oposite;
     char *argv[MAX_ARG];
 
     /* parse command line */
@@ -62,35 +64,59 @@ void execute(char* command) {
     // check for output redirection
     if (i >= 2 && ! strcmp(argv[i - 2], ">")) {
         redirect = 1;
-        argv[i - 2] = NULL;
-        outfile = argv[i - 1];
-        }
-    else 
-        redirect = 0; 
-
-    // check for error redirection
-    if (i >= 2 && ! strcmp(argv[i - 2], "2>")) {
-        redirect_error = 1;
-        argv[i - 2] = NULL;
-        outfile = argv[i - 1];
-        }
-    else 
-        redirect_error = 0;
-
-    // check for output redirection
-    if (i >= 2 && ! strcmp(argv[i - 2], ">>")) {
-        redirect_create = 1;
-        argv[i - 2] = NULL;
-        outfile = argv[i - 1];
-        }
-    else 
+        redirect_oposite = 0;
         redirect_create = 0;
+        redirect_error = 0;
+        argv[i - 2] = NULL;
+        outfile = argv[i - 1];
+    } else {
 
+        // check for error redirection
+        if (i >= 2 && ! strcmp(argv[i - 2], "2>")) {
+            redirect_error = 1;
+            redirect = 0;
+            redirect_create = 0;
+            redirect_oposite = 0;
+            argv[i - 2] = NULL;
+            outfile = argv[i - 1];
+        } else {
+            
+            // check for output redirection
+            if (i >= 2 && ! strcmp(argv[i - 2], ">>")) {
+                printf("enter >>\n");
+                redirect_create = 1;
+                redirect = 0;
+                redirect_error = 0;
+                redirect_oposite = 0;
+                argv[i - 2] = NULL;
+                outfile = argv[i - 1];
+                printf("outfile: %s\n", outfile);
+                printf("redirect_create: %d\n", redirect_create);
+            } else {
+
+                if (i >= 2 && ! strcmp(argv[i - 2], "<")) {
+                    redirect_oposite = 1;
+                    redirect = 0;
+                    redirect_create = 0;
+                    redirect_error = 0;
+                    argv[i - 2] = NULL;
+                    outfile = argv[i - 1];
+                } else {
+                    redirect_create = 0;
+                    redirect = 0;
+                    redirect_error = 0;
+                    redirect_oposite = 0;
+                }
+            }
+        }
+    }
+    
     // exit the shell 
     if (! strcmp(argv[0], "quit")) {
         exit(0);
     }
 
+    printf("here\n");
     if (redirect) {
         fd = creat(outfile, 0660); 
         close (STDOUT_FILENO); 
@@ -107,8 +133,16 @@ void execute(char* command) {
     }
 
     if (redirect_create) {
+        printf("open file\n");
         fd = open(outfile, O_WRONLY | O_APPEND | O_CREAT, 0660); 
         close (STDOUT_FILENO); 
+        dup(fd); 
+        close(fd); 
+    }
+
+    if (redirect_oposite) {
+        fd = open(outfile, O_RDONLY); 
+        close (STDIN_FILENO); 
         dup(fd); 
         close(fd); 
     }
@@ -190,12 +224,11 @@ int main() {
         if (strncmp(command, "echo ", 5) == 0) {
             char* cpy_command = command + 5;
             if (! strcmp(cpy_command, "$?")) {
-                printf("%d\n", status);
-                printf("wtf\n");
+                printf("%d\n", last_command_status);
             } else {
                 printf("%s\n", cpy_command);
-                printf("why?\n");
             }
+            continue;
         }
 
         // check for pipe
@@ -280,9 +313,14 @@ int main() {
             } else if (pid == 0) {
                 signal(SIGINT, handle_sigint);
                 execute(command);
+            } else {
+                wait(&status);
+                if (WIFEXITED(status)) {
+                    last_command_status = WEXITSTATUS(status);
+                }
             }
         }
-        wait(&status);
     }
+    return 0;
 }
 
