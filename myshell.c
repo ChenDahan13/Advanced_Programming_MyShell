@@ -10,7 +10,77 @@
 
 #define MAX_ARG 20
 
+typedef struct {
+    char *name;
+    char *value;
+} variable, *Pvariable;
+
+variable *variables = NULL;
+int variables_count = 0;
+
 int last_command_status = 0;
+
+char* get_variable_value(char *name) {
+    for (int i = 0; i < variables_count; i++) {
+        if (! strcmp(variables[i].name, name)) {
+            return variables[i].value;
+        }
+    }
+    return NULL;
+}
+
+void remove_variable(char *name) {
+    for (int i = 0; i < variables_count; i++) {
+        // check if the variable exists
+        if (! strcmp(variables[i].name, name)) {
+            free(variables[i].name);
+            free(variables[i].value);
+            for (int j = i; j < variables_count - 1; j++) {
+                // shift the variables to the left instead of the removed variable
+                variables[j] = variables[j + 1];
+            }
+            variables_count--;
+            variables = realloc(variables, variables_count * sizeof(variable));
+            return;
+        }
+    }
+}
+
+void set_variable_value(char *name, char *value) {
+    // check if the variable already exists and remove it
+    if (get_variable_value(name) != NULL) {
+        remove_variable(name); 
+    }
+
+    // add the variable to the variables array
+    variables = realloc(variables, (variables_count + 1) * sizeof(variable));
+    variables[variables_count].name =  strdup(name);
+    variables[variables_count].value = strdup(value);
+    variables_count++;
+}
+
+void free_variables() {
+    for (int i = 0; i < variables_count; i++) {
+        free(variables[i].name);
+        free(variables[i].value);
+    }
+    free(variables);
+}
+
+// removing spaces
+char* no_spaces(char* str) {
+    int len = strlen(str);
+    char *new_str = malloc(len + 1);
+    char *p = new_str;
+    for (int i = 0; i < len; i++) {
+        if (str[i] != ' ') {
+            *p = str[i];
+            p++;
+        }
+    }
+    *p = '\0';
+    return new_str;
+}
 
 void initialize_history_commands(char history_commands[20][1024]) {
     for (int i = 0; i < 20; i++) {
@@ -174,6 +244,29 @@ int main() {
             break;
         }
 
+        // adding the variables to the shell
+        if (command[0] == '$') {
+            char cpy_command[1024];
+            strcpy(cpy_command, command);
+            char *variable_name = strtok(cpy_command + 1, "=");
+            if (variable_name != NULL) {
+                char *variable_value = strtok(NULL, " ");
+                if (variable_value != NULL) {
+                    
+                    char *name_without_spaces = no_spaces(variable_name);
+                    char *value_without_spaces = no_spaces(variable_value);
+                    printf("name: %s\n", name_without_spaces);
+                    printf("value: %s\n", value_without_spaces);
+                    
+                    set_variable_value(name_without_spaces, value_without_spaces);
+
+                    free(name_without_spaces);
+                    free(value_without_spaces);
+                }
+            }
+            continue;
+        }
+
         // check for pipe
         for (int i = 0; i < strlen(command); i++) {
             if (command[i] == '|') {
@@ -222,6 +315,12 @@ int main() {
             char* cpy_command = command + 5;
             if (! strcmp(cpy_command, "$?")) {
                 printf("%d\n", last_command_status);
+            } else if (cpy_command[0] == '$') {
+                char *variable_name = cpy_command + 1;
+                char *variable_value = get_variable_value(variable_name);
+                if (variable_value != NULL) {
+                    printf("%s\n", variable_value);
+                } 
             } else {
                 printf("%s\n", cpy_command);
             }
@@ -318,6 +417,7 @@ int main() {
             }
         }
     }
+    free_variables();
     return 0;
 }
 
