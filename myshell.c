@@ -10,6 +10,8 @@
 
 #define MAX_ARG 20
 
+pid_t children[20];
+
 typedef struct {
     char *name;
     char *value;
@@ -21,6 +23,12 @@ int variables_count = 0;
 int last_command_status = 0;
 
 
+void add_child_procces(pid_t children[20], pid_t child) {
+    for (int i = 19; i > 0; i--) {
+        children[i] = children[i - 1];
+    }
+    children[0] = child;
+}
 
 char* get_variable_value(char *name) {
     for (int i = 0; i < variables_count; i++) {
@@ -128,6 +136,11 @@ char *get_last_command(char history_commands[20][1024]) {
 
 void handle_sigint(int sig) {
     printf("\nYou typed Control-C!\n");
+    for (int i = 0; i < 20; i++) {
+        if (children[i] != 0) {
+            kill(children[i], SIGKILL);
+        }
+    }
 }
 
 void execute(char* command) {
@@ -434,6 +447,7 @@ int main() {
                 signal(SIGINT, handle_sigint);
                 execute(command);
             } else {
+                add_child_procces(children, pid);
                 wait(&status);
                 if (WIFEXITED(status)) {
                     last_command_status = WEXITSTATUS(status);
