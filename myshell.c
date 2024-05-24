@@ -20,6 +20,8 @@ int variables_count = 0;
 
 int last_command_status = 0;
 
+
+
 char* get_variable_value(char *name) {
     for (int i = 0; i < variables_count; i++) {
         if (! strcmp(variables[i].name, name)) {
@@ -27,6 +29,29 @@ char* get_variable_value(char *name) {
         }
     }
     return NULL;
+}
+
+void echo_func(char *command) {
+    char *pcommand = command + 5;
+    if (! strcmp(pcommand, "$?")) {
+        printf("%d\n", last_command_status);
+    } else {
+        char cpy_command[1024];
+        strcpy(cpy_command, pcommand); // copy the command to not change the original command
+        char *token = strtok(cpy_command, " "); 
+        while (token != NULL) { // print all the arguments
+            if (token[0] == '$') { // check if the argument is a variable
+                char* value = get_variable_value(token + 1);
+                if (value != NULL) {
+                    printf("%s ", value);
+                }
+            } else {
+                printf("%s ", token);
+            }
+            token = strtok(NULL, " ");
+        }
+        printf("\n");
+    }
 }
 
 void remove_variable(char *name) {
@@ -280,6 +305,18 @@ int main() {
             strcat(prompt, " ");
             continue;
         }
+
+        // Check for read command
+        if (strncmp(command, "read ", 5) == 0) {
+            char *variable_name = command + 5;
+            
+            char value[1024];
+            fgets(value, 1024, stdin);
+            value[strlen(value) - 1] = '\0';
+            set_variable_value(variable_name, value);
+            
+            continue;
+        }
         
         // check for !! command
         if (strcmp(command, "!!") == 0) {
@@ -312,18 +349,7 @@ int main() {
 
          // print all arguments echo command
         if (strncmp(command, "echo ", 5) == 0) {
-            char* cpy_command = command + 5;
-            if (! strcmp(cpy_command, "$?")) {
-                printf("%d\n", last_command_status);
-            } else if (cpy_command[0] == '$') {
-                char *variable_name = cpy_command + 1;
-                char *variable_value = get_variable_value(variable_name);
-                if (variable_value != NULL) {
-                    printf("%s\n", variable_value);
-                } 
-            } else {
-                printf("%s\n", cpy_command);
-            }
+            echo_func(command);
             continue;
         }
 
