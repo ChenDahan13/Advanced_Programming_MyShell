@@ -280,8 +280,6 @@ int main() {
                     
                     char *name_without_spaces = no_spaces(variable_name);
                     char *value_without_spaces = no_spaces(variable_value);
-                    printf("name: %s\n", name_without_spaces);
-                    printf("value: %s\n", value_without_spaces);
                     
                     set_variable_value(name_without_spaces, value_without_spaces);
 
