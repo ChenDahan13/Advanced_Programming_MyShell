@@ -324,10 +324,11 @@ int main() {
 
         // check for if/else command
         if (strncmp(command, "if ", 3) == 0) {
-            printf("if command\n");
             char* cond_command = handle_if_else(command);
             if (cond_command != NULL) 
                 strcpy(command, cond_command);
+            else
+                continue;
         }
 
         // adding the variables to the shell
