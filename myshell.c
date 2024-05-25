@@ -258,6 +258,46 @@ void execute(char* command) {
         retid = wait(&status);
 }
 
+int evaluate_condition(char *condition) {
+    char command[1024];
+    snprintf(command, sizeof(command), "%s > /dev/null 2>&1", condition);
+    int status = system(command);
+    return WEXITSTATUS(status);
+}
+
+char* handle_if_else(char *command) {
+    char *condition = strstr(command, "if ");
+    if (!condition) return NULL;
+
+    condition += 3; // Skip past "if "
+
+    char *then_part = strstr(condition, " then ");
+    if (!then_part) return NULL;
+    *then_part = '\0'; // Terminate condition part
+    then_part += 6; // Skip past " then "
+
+    char *else_part = strstr(then_part, " else ");
+    char *end_if = strstr(then_part, " fi");
+    if (!end_if) return NULL;
+    *end_if = '\0'; // Terminate the then part
+    end_if += 3; // Skip past " fi"
+
+    if (else_part) {
+        *else_part = '\0'; // Terminate then part before else
+        else_part += 6; // Skip past " else "
+    }
+
+    // Evaluate condition
+    int condition_result = evaluate_condition(condition);
+
+    if (condition_result == 0) {
+        return then_part;
+    } else if (else_part) {
+        return else_part;
+    } else {
+        return NULL;
+    }
+}
 
 int main() {
     char command[1024];
@@ -280,6 +320,14 @@ int main() {
 
         if (! strcmp(command, "quit")) {
             break;
+        }
+
+        // check for if/else command
+        if (strncmp(command, "if ", 3) == 0) {
+            printf("if command\n");
+            char* cond_command = handle_if_else(command);
+            if (cond_command != NULL) 
+                strcpy(command, cond_command);
         }
 
         // adding the variables to the shell
