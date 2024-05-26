@@ -322,15 +322,6 @@ int main() {
             break;
         }
 
-        // check for if/else command
-        if (strncmp(command, "if ", 3) == 0) {
-            char* cond_command = handle_if_else(command);
-            if (cond_command != NULL) 
-                strcpy(command, cond_command);
-            else
-                continue;
-        }
-
         // adding the variables to the shell
         if (command[0] == '$') {
             char cpy_command[1024];
@@ -359,6 +350,31 @@ int main() {
             }
         }
 
+        // check for !! command
+        if (strcmp(command, "!!") == 0) {
+            
+            char* last_command = get_last_command(history_commands);
+            
+            // if no commands in history
+            if (strcmp(last_command, "") == 0) {
+                printf("No commands in history\n");
+                continue;
+            } else { // execute the last command
+                strcpy(command, last_command);
+            }
+        } else { 
+            add_to_history_commands(command, history_commands);
+        }
+
+        // check for if/else command
+        if (strncmp(command, "if ", 3) == 0) {
+            char* cond_command = handle_if_else(command);
+            if (cond_command != NULL) 
+                strcpy(command, cond_command);
+            else
+                continue;
+        }
+
         // Check for prompt change command 
         if (strncmp(command, "prompt = ", 9) == 0) {
             strcpy(prompt, command + 9);
@@ -376,22 +392,6 @@ int main() {
             set_variable_value(variable_name, value);
             
             continue;
-        }
-        
-        // check for !! command
-        if (strcmp(command, "!!") == 0) {
-            
-            char* last_command = get_last_command(history_commands);
-            
-            // if no commands in history
-            if (strcmp(last_command, "") == 0) {
-                printf("No commands in history\n");
-                continue;
-            } else { // execute the last command
-                strcpy(command, last_command);
-            }
-        } else { 
-            add_to_history_commands(command, history_commands);
         }
 
         // check for cd command 
