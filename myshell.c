@@ -269,22 +269,22 @@ char* handle_if_else(char *command) {
     char *condition = strstr(command, "if ");
     if (!condition) return NULL;
 
-    condition += 3; // Skip past "if "
+    condition += 3; // skip past "if "
 
     char *then_part = strstr(condition, " then ");
     if (!then_part) return NULL;
-    *then_part = '\0'; // Terminate condition part
-    then_part += 6; // Skip past " then "
+    *then_part = '\0'; // terminate condition part
+    then_part += 6; // skip past " then "
 
     char *else_part = strstr(then_part, " else ");
     char *end_if = strstr(then_part, " fi");
     if (!end_if) return NULL;
-    *end_if = '\0'; // Terminate the then part
-    end_if += 3; // Skip past " fi"
+    *end_if = '\0'; // terminate the then part
+    end_if += 3; // skip past " fi"
 
     if (else_part) {
-        *else_part = '\0'; // Terminate then part before else
-        else_part += 6; // Skip past " else "
+        *else_part = '\0'; // terminate then part before else
+        else_part += 6; // skip past " else "
     }
 
     // Evaluate condition
