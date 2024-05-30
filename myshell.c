@@ -198,7 +198,6 @@ void execute(char* command) {
             
             // check for output redirection
             if (i >= 2 && ! strcmp(argv[i - 2], ">>")) {
-                printf("enter >>\n");
                 redirect_create = 1;
                 redirect = 0;
                 redirect_error = 0;
@@ -245,7 +244,6 @@ void execute(char* command) {
     }
 
     if (redirect_create) {
-        printf("open file\n");
         fd = open(outfile, O_WRONLY | O_APPEND | O_CREAT, 0660); 
         close (STDOUT_FILENO); 
         dup(fd); 
