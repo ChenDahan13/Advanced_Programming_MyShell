@@ -22,6 +22,13 @@ int variables_count = 0;
 
 int last_command_status = 0;
 
+// if else variables
+char then_commands[20][1024];
+char else_commands[20][1024];
+int then_count = 0;
+int else_count = 0;
+int current_command = 0;
+
 
 void add_child_procces(pid_t children[20], pid_t child) {
     for (int i = 19; i > 0; i--) {
@@ -261,42 +268,57 @@ void execute(char* command) {
 int evaluate_condition(char *condition) {
     char command[1024];
     snprintf(command, sizeof(command), "%s > /dev/null 2>&1", condition);
-    int status = system(command);
+    int status = system(command);  
     return WEXITSTATUS(status);
 }
 
-char* handle_if_else(char *command) {
-    char *condition = strstr(command, "if ");
-    if (!condition) return NULL;
+void handle_if_else(char *command) {
+   
+   char *condition = command + 3;
+    int then_flag = 0;
+    int else_flag = 0;
 
-    condition += 3; // skip past "if "
+    int condition_status = evaluate_condition(condition);
 
-    char *then_part = strstr(condition, " then ");
-    if (!then_part) return NULL;
-    *then_part = '\0'; // terminate condition part
-    then_part += 6; // skip past " then "
+    while (1) {
 
-    char *else_part = strstr(then_part, " else ");
-    char *end_if = strstr(then_part, " fi");
-    if (!end_if) return NULL;
-    *end_if = '\0'; // terminate the then part
-    end_if += 3; // skip past " fi"
+        printf(">> ");
+        fgets(command, 1024, stdin); // get the next command
+        command[strlen(command) - 1] = '\0';
 
-    if (else_part) {
-        *else_part = '\0'; // terminate then part before else
-        else_part += 6; // skip past " else "
+        if (strcmp(command, "then") == 0) {
+            then_flag = 1;
+            continue;
+        }
+        else if (strcmp(command, "else") == 0) {
+            else_flag = 1;
+            then_flag = 0;
+            continue;
+        }
+        else if (strcmp(command, "fi") == 0) {
+            break;
+        }
+
+        if (then_flag) {
+            strcpy(then_commands[then_count], command);
+            then_count++;
+        } else if (else_flag) {
+            strcpy(else_commands[else_count], command);
+            else_count++;
+        }
     }
 
-    // Evaluate condition
-    int condition_result = evaluate_condition(condition);
-
-    if (condition_result == 0) {
-        return then_part;
-    } else if (else_part) {
-        return else_part;
-    } else {
-        return NULL;
-    }
+    if (!condition_status) { // condition true, delete the else commands
+        for (int i = 0; i < else_count; i++) {
+            else_commands[i][0] = '\0';
+        }
+        else_count = 0;
+    } else { // condition false, delete the then commands
+        for (int i = 0; i < then_count; i++) {
+            then_commands[i][0] = '\0';
+        }
+        then_count = 0;
+    }   
 }
 
 int main() {
@@ -312,14 +334,37 @@ int main() {
 
     while (1)
     {   
-        pipe_count = 0;
-        // get the command from the user
-        printf("%s", prompt);
-        fgets(command, 1024, stdin);
-        command[strlen(command) - 1] = '\0';
+        if (then_count > 0) { // execute the then commands
+            strcpy(command, then_commands[current_command]);
+            then_commands[current_command++][0] = '\0';
+            if (current_command == then_count) { // all the commands were executed
+                then_count = 0;
+                current_command = 0;
+            } 
+        }
+        else if (else_count > 0) { // execute the else commands
+            strcpy(command, else_commands[current_command]);
+            else_commands[current_command++][0] = '\0';
+            if (current_command == else_count) { // all the commands were executed
+                else_count = 0;
+                current_command = 0;
+            }
+        } else {
+
+            // get the command from the user
+            printf("%s", prompt);
+            fgets(command, 1024, stdin);
+            command[strlen(command) - 1] = '\0';
+
+            // check for if/else command
+            if (strncmp(command, "if ", 3) == 0) {
+                handle_if_else(command);
+                continue;
+            }  
+        }
 
         if (! strcmp(command, "quit")) {
-            break;
+                break;
         }
 
         // adding the variables to the shell
@@ -343,6 +388,7 @@ int main() {
             continue;
         }
 
+        pipe_count = 0;
         // check for pipe
         for (int i = 0; i < strlen(command); i++) {
             if (command[i] == '|') {
@@ -364,15 +410,6 @@ int main() {
             }
         } else { 
             add_to_history_commands(command, history_commands);
-        }
-
-        // check for if/else command
-        if (strncmp(command, "if ", 3) == 0) {
-            char* cond_command = handle_if_else(command);
-            if (cond_command != NULL) 
-                strcpy(command, cond_command);
-            else
-                continue;
         }
 
         // Check for prompt change command 
