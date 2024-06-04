@@ -1,21 +1,6 @@
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include "stdio.h"
-#include "errno.h"
-#include "stdlib.h"
-#include "unistd.h"
-#include <string.h>
-#include <signal.h>
-
-#define MAX_ARG 20
+#include "myshell.h"
 
 pid_t children[20];
-
-typedef struct {
-    char *name;
-    char *value;
-} variable, *Pvariable;
 
 variable *variables = NULL;
 int variables_count = 0;
@@ -29,6 +14,7 @@ int then_count = 0;
 int else_count = 0;
 int current_command = 0;
 
+int history_command_count = 0;
 
 void add_child_procces(pid_t children[20], pid_t child) {
     for (int i = 19; i > 0; i--) {
@@ -134,6 +120,9 @@ void add_to_history_commands(char *command, char history_commands[20][1024]) {
         strcpy(history_commands[i], history_commands[i - 1]);
     }
     strcpy(history_commands[0], command);
+    if (history_command_count < 20) {
+        history_command_count++;
+    }
 }
 
 // return the last command from the history of commands
@@ -349,10 +338,8 @@ int main() {
             }
         } else {
 
-            // get the command from the user
-            printf("%s", prompt);
-            fgets(command, 1024, stdin);
-            command[strlen(command) - 1] = '\0';
+            // Get the command from the user
+            get_command(prompt, command, history_commands, history_command_count);
 
             // check for if/else command
             if (strncmp(command, "if ", 3) == 0) {
@@ -413,7 +400,7 @@ int main() {
         // Check for prompt change command 
         if (strncmp(command, "prompt = ", 9) == 0) {
             strcpy(prompt, command + 9);
-            strcat(prompt, " ");
+            strcat(prompt, ": ");
             continue;
         }
 
@@ -542,4 +529,3 @@ int main() {
     free_variables();
     return 0;
 }
-
